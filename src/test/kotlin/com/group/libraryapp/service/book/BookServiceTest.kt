@@ -11,6 +11,8 @@ import com.group.libraryapp.dto.book.request.BookRequest
 import com.group.libraryapp.dto.book.request.BookReturnRequest
 import com.group.libraryapp.domain.user.loanhistory.UserLoanHistory
 import com.group.libraryapp.domain.user.loanhistory.UserLoanStatus
+import com.group.libraryapp.dto.book.response.BookStatResponse
+import com.group.libraryapp.repository.book.BookQuerydslRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -24,8 +26,9 @@ class BookServiceTest @Autowired constructor(
     private val bookService:BookService,
     private val bookRepository: BookRepository,
     private val userRepository: UserRepository,
-    private val userLoanHistoryRepository: UserLoanHistoryRepository
-){
+    private val userLoanHistoryRepository: UserLoanHistoryRepository,
+    private val bookQuerydslRepository: BookQuerydslRepository,
+    ){
 
     @AfterEach
     fun clean(){
@@ -100,5 +103,54 @@ class BookServiceTest @Autowired constructor(
         assertThat(results[0].status).isEqualTo(UserLoanStatus.RETURNED)
     }
 
+
+    @Test
+    @DisplayName("책 대여 권수를 정상 확인한다.")
+    fun countLoanedBookTest(){
+        // given
+        val savedUser = userRepository.save(User("송명진",null))
+        userLoanHistoryRepository.saveAll(listOf(
+            UserLoanHistory.fixture(savedUser, "A"),
+            UserLoanHistory.fixture(savedUser, "B",UserLoanStatus.RETURNED),
+            UserLoanHistory.fixture(savedUser, "C",UserLoanStatus.RETURNED),
+        ))
+
+        // when
+        val results = bookService.countLoanedBook()
+
+        // then
+        assertThat(results).isEqualTo(1)
+    }
+
+    @Test
+    @DisplayName("분야별 책 권수를 정상 확인한다.")
+    fun getBookStatisticsTest(){
+        // given
+        bookRepository.saveAll(listOf(
+            Book.fixture("A",BookType.COMPUTER),
+            Book.fixture("B",BookType.COMPUTER),
+            Book.fixture("C",BookType.SCIENCE),
+        ))
+
+        // when
+        val results = bookQuerydslRepository.getStats()
+
+        // then
+        assertThat(results).hasSize(2)
+//        val computerDto = results.first { result -> result.type == BookType.COMPUTER }
+//        assertThat(computerDto.count).isEqualTo(2)
+//
+//        val scienceDto = results.first { result -> result.type == BookType.SCIENCE }
+//        assertThat(scienceDto.count).isEqualTo(1)
+        assertCount(results,BookType.COMPUTER, 2L)
+        assertCount(results,BookType.SCIENCE, 1L)
+
+    }
+
+    private fun assertCount(results: List<BookStatResponse>, type: BookType, count: Long){
+        assertThat(results.first{
+            result -> result.type == type
+        }.count).isEqualTo(count)
+    }
 
 }
